@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Cup Voting App</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #0a0a14 0%, #1a0a2e 50%, #16213e 100%);
+      color: #f1f5fe;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    *:focus-visible {
+      outline: 2px solid #ec4899;
+      outline-offset: 2px;
+    }
+
+    input:focus {
+      border-color: #a855f7 !important;
+      background: rgba(168, 85, 247, 0.1) !important;
+    }
+
+    button:hover {
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const API_BASE = "http://localhost:4000/api";
+
+    function VotingApp() {
+      const [authState, setAuthState] = React.useState("login");
+      const [username, setUsername] = React.useState("");
+      const [password, setPassword] = React.useState("");
+      const [token, setToken] = React.useState(localStorage.getItem("token"));
+      const [countries, setCountries] = React.useState([]);
+      const [leaderboard, setLeaderboard] = React.useState([]);
+      const [userVotes, setUserVotes] = React.useState([]);
+      const [loading, setLoading] = React.useState(false);
+      const [error, setError] = React.useState("");
+      const [success, setSuccess] = React.useState("");
+
+      const countryFlags = {
+        // CONMEBOL
+        Argentina: "🇦🇷",
+        Brazil: "🇧🇷",
+        Uruguay: "🇺🇾",
+        Colombia: "🇨🇴",
+        Ecuador: "🇪🇨",
+        Venezuela: "🇻🇪",
+        Paraguay: "🇵🇾",
+        Bolivia: "🇧🇴",
+        Chile: "🇨🇱",
+        Peru: "🇵🇪",
+        // UEFA
+        England: "🇬🇧",
+        France: "🇫🇷",
+        Germany: "🇩🇪",
+        Spain: "🇪🇸",
+        Portugal: "🇵🇹",
+        Netherlands: "🇳🇱",
+        Belgium: "🇧🇪",
+        Croatia: "🇭🇷",
+        Italy: "🇮🇹",
+        Switzerland: "🇨🇭",
+        Denmark: "🇩🇰",
+        Austria: "🇦🇹",
+        Serbia: "🇷🇸",
+        Turkey: "🇹🇷",
+        Ukraine: "🇺🇦",
+        Poland: "🇵🇱",
+        // CAF
+        Morocco: "🇲🇦",
+        Senegal: "🇸🇳",
+        Nigeria: "🇳🇬",
+        Egypt: "🇪🇬",
+        Algeria: "🇩🇿",
+        "Ivory Coast": "🇨🇮",
+        Cameroon: "🇨🇲",
+        "South Africa": "🇿🇦",
+        Mali: "🇲🇱",
+        Tunisia: "🇹🇳",
+        Ghana: "🇬🇭",
+        // CONCACAF
+        "United States": "🇺🇸",
+        Mexico: "🇲🇽",
+        Canada: "🇨🇦",
+        "Costa Rica": "🇨🇷",
+        // AFC
+        Japan: "🇯🇵",
+        "South Korea": "🇰🇷",
+        "Saudi Arabia": "🇸🇦",
+        Australia: "🇦🇺",
+        Iran: "🇮🇷",
+        Iraq: "🇮🇶",
+        // OFC
+        "New Zealand": "🇳🇿"
+      };
+
+      React.useEffect(() => {
+        if (token) {
+          fetchCountries();
+          fetchMyVotes();
+          fetchLeaderboard();
+          const interval = setInterval(fetchLeaderboard, 5000);
+          return () => clearInterval(interval);
+        }
+      }, [token]);
+
+      const fetchCountries = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/countries`, {
+            headers: { "Authorization": token }
+          });
+          const data = await res.json();
+          setCountries(data);
+        } catch (err) {
+          setError("Failed to load countries");
+        }
+      };
+
+      const fetchMyVotes = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/my-votes`, {
+            headers: { "Authorization": token }
+          });
+          const data = await res.json();
+          // store just the IDs for easy comparison
+          setUserVotes(data.map(v => v._id));
+        } catch (err) {
+          console.error("Failed to load user votes");
+        }
+      };
+
+      const fetchLeaderboard = async () => {
+        try {
+          const res = await fetch(`${API_BASE}/leaderboard`, {
+            headers: { "Authorization": token }
+          });
+          const data = await res.json();
+          setLeaderboard(data);
+        } catch (err) {
+          console.error("Leaderboard fetch failed");
+        }
+      };
+
+      const handleRegister = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+          const res = await fetch(`${API_BASE}/auth/register`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data.message);
+            return;
+          }
+
+          setSuccess("Registration successful! Please log in.");
+          setTimeout(() => {
+            setAuthState("login");
+            setUsername("");
+            setPassword("");
+            setSuccess("");
+          }, 2000);
+        } catch (err) {
+          setError("Registration failed");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+          const res = await fetch(`${API_BASE}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password })
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data.message);
+            return;
+          }
+
+          localStorage.setItem("token", data.token);
+          setToken(data.token);
+          setUsername("");
+          setPassword("");
+          setAuthState("voting");
+        } catch (err) {
+          setError("Login failed");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      const handleVote = async (countryId) => {
+        try {
+          const res = await fetch(`${API_BASE}/vote/${countryId}`, {
+            method: "POST",
+            headers: {
+              "Authorization": token,
+              "Content-Type": "application/json"
+            }
+          });
+
+          const data = await res.json();
+
+          if (!res.ok) {
+            setError(data.message);
+            return;
+          }
+
+          setSuccess("Vote recorded! ⚡");
+          fetchCountries();
+          fetchMyVotes();
+          fetchLeaderboard();
+          setTimeout(() => setSuccess(""), 3000);
+        } catch (err) {
+          setError("Voting failed");
+        }
+      };
+
+      const handleLogout = () => {
+        localStorage.removeItem("token");
+        setToken(null);
+        setCountries([]);
+        setLeaderboard([]);
+        setUserVotes([]);
+        setAuthState("login");
+      };
+
+      if (!token) {
+        return (
+          <div style={{
+            minHeight: "100vh",
+            background: "linear-gradient(135deg, #0f1b2e 0%, #1a3a52 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px"
+          }}>
+            <div style={{
+              background: "#ffffff",
+              borderRadius: "16px",
+              padding: "48px 40px",
+              width: "100%",
+              maxWidth: "420px",
+              boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)",
+              animation: "slideUp 0.6s ease-out"
+            }}>
+              <div style={{ textAlign: "center", marginBottom: "40px" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>⚽</div>
+                <h1 style={{
+                  fontSize: "28px",
+                  fontWeight: "700",
+                  color: "#0f1b2e",
+                  margin: "0 0 8px 0",
+                  letterSpacing: "-0.5px"
+                }}>World Cup Votes</h1>
+                <p style={{
+                  fontSize: "14px",
+                  color: "#7f8c8d",
+                  margin: "0",
+                  fontWeight: "500"
+                }}>Vote for your champion</p>
+              </div>
+
+              <form onSubmit={authState === "login" ? handleLogin : handleRegister} style={{ marginBottom: "24px" }}>
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#2c3e50",
+                    marginBottom: "8px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px"
+                  }}>Username</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Choose your username"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "2px solid #ecf0f1",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      transition: "all 0.2s",
+                      boxSizing: "border-box",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={{
+                    display: "block",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    color: "#2c3e50",
+                    marginBottom: "8px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.5px"
+                  }}>Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      border: "2px solid #ecf0f1",
+                      borderRadius: "8px",
+                      fontSize: "14px",
+                      fontFamily: "inherit",
+                      transition: "all 0.2s",
+                      boxSizing: "border-box",
+                      outline: "none"
+                    }}
+                  />
+                </div>
+
+                {error && <div style={{
+                  background: "#ffe0e0",
+                  border: "1px solid #ffb3b3",
+                  color: "#c0392b",
+                  padding: "12px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  marginBottom: "16px",
+                  textAlign: "center",
+                  fontWeight: "500"
+                }}>{error}</div>}
+
+                {success && <div style={{
+                  background: "#e0ffe0",
+                  border: "1px solid #b3ffb3",
+                  color: "#27ae60",
+                  padding: "12px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  marginBottom: "16px",
+                  textAlign: "center",
+                  fontWeight: "500"
+                }}>{success}</div>}
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    width: "100%",
+                    padding: "14px 20px",
+                    background: "linear-gradient(135deg, #f4b860, #e8a44a)",
+                    border: "none",
+                    borderRadius: "8px",
+                    fontSize: "15px",
+                    fontWeight: "700",
+                    color: "#ffffff",
+                    cursor: loading ? "not-allowed" : "pointer",
+                    transition: "all 0.3s ease",
+                    boxShadow: "0 6px 20px rgba(244, 184, 96, 0.25)",
+                    letterSpacing: "0.3px",
+                    opacity: loading ? 0.7 : 1
+                  }}
+                >
+                  {loading ? "Processing..." : authState === "login" ? "Sign In" : "Create Account"}
+                </button>
+              </form>
+
+              <div style={{ textAlign: "center" }}>
+                <p style={{ fontSize: "13px", color: "#7f8c8d", margin: "0" }}>
+                  {authState === "login" ? "Don't have an account? " : "Already have an account? "}
+                  <button
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#f4b860",
+                      cursor: "pointer",
+                      fontSize: "13px",
+                      fontWeight: "700",
+                      padding: "0 4px"
+                    }}
+                    onClick={() => {
+                      setAuthState(authState === "login" ? "register" : "login");
+                      setError("");
+                      setSuccess("");
+                    }}
+                  >
+                    {authState === "login" ? "Sign Up" : "Sign In"}
+                  </button>
+                </p>
+              </div>
+
+              <div style={{
+                marginTop: "32px",
+                paddingTop: "24px",
+                borderTop: "1px solid #ecf0f1",
+                textAlign: "center"
+              }}>
+                <p style={{ fontSize: "11px", color: "#b0bec5", margin: "0 0 12px 0", letterSpacing: "0.5px", fontWeight: "600", textTransform: "uppercase" }}>Powered by</p>
+                <svg viewBox="100 30 480 300" xmlns="http://www.w3.org/2000/svg" style={{ width: "260px", height: "auto", display: "inline-block" }}>
+                  <rect x="100" y="30" width="480" height="300" rx="18" fill="#eaf3de"/>
+                  <rect x="152" y="95" width="13" height="130" rx="2" fill="#1D9E75"/>
+                  <polygon points="165,95 165,160 217,95 233,95 181,160 165,160" fill="#1D9E75"/>
+                  <polygon points="165,160 165,225 181,160 233,225 217,225" fill="#0F6E56"/>
+                  <polygon points="181,160 199,147 199,173" fill="#5DCAA5" opacity="0.75"/>
+                  <text x="256" y="145" fontFamily="Georgia, serif" fontSize="52" fontWeight="700" dominantBaseline="middle" fill="#173404">kdt</text>
+                  <rect x="256" y="172" width="270" height="1.5" rx="1" fill="#1D9E75" opacity="0.3"/>
+                  <text x="258" y="194" fontFamily="'Courier New', monospace" fontSize="15.5" letterSpacing="5" dominantBaseline="middle" fill="#3b6d11">resource</text>
+                  <text x="258" y="233" fontFamily="Georgia, serif" fontSize="13.5" fontStyle="italic" dominantBaseline="middle" fill="#0F6E56">Powering Your Digital World</text>
+                  <circle cx="248" cy="233" r="3" fill="#5DCAA5" opacity="0.85"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      // Voting view
+      return (
+        <div style={{ minHeight: "100vh", background: "linear-gradient(135deg, #0f1b2e 0%, #1a3a52 100%)", paddingBottom: "40px" }}>
+          <div style={{
+            background: "rgba(15, 27, 46, 0.8)",
+            borderBottom: "2px solid #f4b860",
+            backdropFilter: "blur(10px)",
+            padding: "24px 0",
+            position: "sticky",
+            top: "0",
+            zIndex: "100"
+          }}>
+            <div style={{
+              maxWidth: "1400px",
+              margin: "0 auto",
+              padding: "0 24px",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center"
+            }}>
+              <div>
+                <h1 style={{
+                  fontSize: "32px",
+                  fontWeight: "800",
+                  color: "#ffffff",
+                  margin: "0 0 8px 0",
+                  letterSpacing: "-0.8px"
+                }}>⚽ World Cup Voting</h1>
+                <p style={{
+                  fontSize: "13px",
+                  color: "#b0bec5",
+                  margin: "0",
+                  fontWeight: "500"
+                }}>
+                  Votes Cast: <span style={{
+                    background: "linear-gradient(135deg, #f4b860, #e8a44a)",
+                    color: "white",
+                    padding: "2px 8px",
+                    borderRadius: "4px",
+                    fontWeight: "700",
+                    fontSize: "12px"
+                  }}>{userVotes.length}/3</span>
+                </p>
+              </div>
+              <button style={{
+                padding: "10px 20px",
+                background: "#e74c3c",
+                color: "white",
+                border: "none",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: "600",
+                transition: "all 0.2s"
+              }} onClick={handleLogout}>
+                Sign Out
+              </button>
+            </div>
+          </div>
+
+          <div style={{
+            maxWidth: "1400px",
+            margin: "0 auto",
+            padding: "40px 24px",
+            display: "grid",
+            gridTemplateColumns: "1fr 320px",
+            gap: "40px"
+          }}>
+            <div>
+              <div style={{ marginBottom: "32px" }}>
+                <h2 style={{
+                  fontSize: "24px",
+                  fontWeight: "700",
+                  color: "#ffffff",
+                  margin: "0",
+                  letterSpacing: "-0.5px"
+                }}>Vote for Your Champions</h2>
+              </div>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: "20px"
+              }}>
+                {countries.map((country) => {
+                  const hasVoted = userVotes.includes(country._id);
+                  const isDisabled = userVotes.length >= 3 && !hasVoted;
+
+                  return (
+                    <div
+                      key={country._id}
+                      style={{
+                        background: "linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 250, 255, 0.95) 100%)",
+                        borderRadius: "12px",
+                        padding: "24px 20px",
+                        textAlign: "center",
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                        border: "2px solid transparent",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 15px rgba(0, 0, 0, 0.1)",
+                        opacity: isDisabled ? 0.6 : 1,
+                        transform: hasVoted ? "scale(0.98)" : "scale(1)"
+                      }}
+                    >
+                      <div style={{
+                        fontSize: "64px",
+                        marginBottom: "12px",
+                        display: "inline-block",
+                        animation: "float 3s ease-in-out infinite"
+                      }}>
+                        {countryFlags[country.name] || "🏳️"}
+                      </div>
+                      <h3 style={{
+                        fontSize: "18px",
+                        fontWeight: "700",
+                        color: "#0f1b2e",
+                        margin: "0 0 16px 0",
+                        letterSpacing: "-0.3px"
+                      }}>{country.name}</h3>
+                      {hasVoted && (
+                        <div style={{
+                          marginBottom: "16px",
+                          padding: "10px",
+                          background: "rgba(29, 158, 117, 0.08)",
+                          borderRadius: "8px",
+                          fontSize: "12px",
+                          fontWeight: "600",
+                          color: "#1D9E75",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px"
+                        }}>✓ Your vote</div>
+                      )}
+                      <button
+                        onClick={() => handleVote(country._id)}
+                        disabled={isDisabled || hasVoted}
+                        style={{
+                          width: "100%",
+                          padding: "12px 16px",
+                          background: hasVoted
+                            ? "#34495e"
+                            : isDisabled
+                            ? "#bdc3c7"
+                            : "linear-gradient(135deg, #f4b860, #e8a44a)",
+                          border: "none",
+                          borderRadius: "8px",
+                          fontSize: "14px",
+                          fontWeight: "700",
+                          color: "white",
+                          cursor: isDisabled || hasVoted ? "not-allowed" : "pointer",
+                          transition: "all 0.3s ease",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px",
+                          boxShadow: hasVoted || isDisabled
+                            ? "none"
+                            : "0 8px 24px rgba(244, 184, 96, 0.3)"
+                        }}
+                      >
+                        {hasVoted ? "✓ Voted" : "Vote"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div style={{
+              background: "rgba(255, 255, 255, 0.95)",
+              borderRadius: "12px",
+              padding: "24px",
+              position: "sticky",
+              top: "100px",
+              height: "fit-content",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.15)"
+            }}>
+              <h2 style={{
+                fontSize: "20px",
+                fontWeight: "700",
+                color: "#0f1b2e",
+                margin: "0 0 20px 0",
+                letterSpacing: "-0.3px"
+              }}>🏆 Leaderboard</h2>
+
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr 1fr",
+                gap: "8px",
+                marginBottom: "24px"
+              }}>
+                {leaderboard.map((country, idx) => (
+                  <div
+                    key={country._id}
+                    style={{
+                      background:
+                        idx === 0
+                          ? "linear-gradient(135deg, #FFD700, #FFA500)"
+                          : idx === 1
+                          ? "linear-gradient(135deg, #C0C0C0, #A9A9A9)"
+                          : "linear-gradient(135deg, #CD7F32, #B8860B)",
+                      borderRadius: "8px",
+                      padding: "12px 8px",
+                      textAlign: "center",
+                      color: "white",
+                      fontSize: "12px",
+                      fontWeight: "700",
+                      transition: "transform 0.3s ease",
+                      transform: `translateY(${idx === 0 ? -20 : idx === 1 ? -10 : 0}px)`
+                    }}
+                  >
+                    <div style={{ fontSize: "16px", marginBottom: "4px" }}>{idx + 1}</div>
+                    <div style={{ fontSize: "28px", margin: "4px 0" }}>
+                      {countryFlags[country.name] || "🏳️"}
+                    </div>
+                    <div style={{ fontSize: "12px", fontWeight: "700", marginBottom: "4px", lineHeight: "1.2" }}>
+                      {country.name}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
+                {leaderboard.map((country, idx) => (
+                  <div
+                    key={country._id}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "30px 1fr 40px",
+                      alignItems: "center",
+                      padding: "12px 0",
+                      borderBottom: "1px solid #ecf0f1",
+                      gap: "12px",
+                      fontSize: "13px"
+                    }}
+                  >
+                    <div style={{ fontWeight: "700", color: "#f4b860", textAlign: "center" }}>#{idx + 1}</div>
+                    <div style={{ color: "#0f1b2e", fontWeight: "600", display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span style={{ fontSize: "18px" }}>
+                        {countryFlags[country.name] || "🏳️"}
+                      </span>
+                      {country.name}
+                    </div>
+                    <div style={{ textAlign: "right", fontWeight: "700", color: "#7f8c8d" }}>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div style={{
+              position: "fixed",
+              bottom: "24px",
+              right: "24px",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              animation: "slideIn 0.4s ease-out",
+              zIndex: "1000"
+            }}>
+              <div style={{
+                background: "#e74c3c",
+                color: "white",
+                padding: "14px 20px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                boxShadow: "0 8px 24px rgba(231, 76, 60, 0.3)"
+              }}>
+                {error}
+              </div>
+              <button
+                onClick={() => setError("")}
+                style={{
+                  background: "rgba(255, 255, 255, 0.2)",
+                  border: "none",
+                  color: "white",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "6px",
+                  cursor: "pointer",
+                  fontSize: "16px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center"
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+
+          {success && (
+            <div style={{
+              position: "fixed",
+              bottom: "24px",
+              right: "24px",
+              animation: "slideIn 0.4s ease-out",
+              zIndex: "1000"
+            }}>
+              <div style={{
+                background: "#27ae60",
+                color: "white",
+                padding: "14px 20px",
+                borderRadius: "8px",
+                fontSize: "13px",
+                fontWeight: "600",
+                boxShadow: "0 8px 24px rgba(39, 174, 96, 0.3)"
+              }}>
+                {success}
+              </div>
+            </div>
+          )}
+
+          <div style={{
+            textAlign: "center",
+            padding: "32px 24px 16px",
+            borderTop: "1px solid rgba(255,255,255,0.07)",
+            marginTop: "20px"
+          }}>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.45)", margin: "0 0 12px 0", letterSpacing: "0.5px", textTransform: "uppercase", fontWeight: "600" }}>Powered by</p>
+            <svg viewBox="100 30 480 300" xmlns="http://www.w3.org/2000/svg" style={{ width: "260px", height: "auto", display: "inline-block" }}>
+              <rect x="100" y="30" width="480" height="300" rx="18" fill="rgba(234,243,222,0.08)"/>
+              <rect x="152" y="95" width="13" height="130" rx="2" fill="#1D9E75"/>
+              <polygon points="165,95 165,160 217,95 233,95 181,160 165,160" fill="#1D9E75"/>
+              <polygon points="165,160 165,225 181,160 233,225 217,225" fill="#0F6E56"/>
+              <polygon points="181,160 199,147 199,173" fill="#5DCAA5" opacity="0.75"/>
+              <text x="256" y="145" fontFamily="Georgia, serif" fontSize="52" fontWeight="700" dominantBaseline="middle" fill="#ffffff">kdt</text>
+              <rect x="256" y="172" width="270" height="1.5" rx="1" fill="#5DCAA5" opacity="0.4"/>
+              <text x="258" y="194" fontFamily="'Courier New', monospace" fontSize="15.5" letterSpacing="5" dominantBaseline="middle" fill="#5DCAA5">resource</text>
+              <text x="258" y="233" fontFamily="Georgia, serif" fontSize="13.5" fontStyle="italic" dominantBaseline="middle" fill="#1D9E75">Powering Your Digital World</text>
+              <circle cx="248" cy="233" r="3" fill="#5DCAA5" opacity="0.85"/>
+            </svg>
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<VotingApp />);
+  </script>
+</body>
+</html>

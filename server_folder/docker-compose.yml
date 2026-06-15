@@ -1,0 +1,32 @@
+services:
+  web-node:
+     build:
+       context: ./server_folder
+       dockerfile: Dockerfile
+     container_name: worldcup
+     restart: unless-stopped
+     env_file:
+       - ./server_folder/.env
+     expose:
+      - 4000
+     networks:
+      - worldcup-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: worldcup_nginx
+    restart: on-failure
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl
+    depends_on:
+      - web-node
+    networks:
+      - worldcup-network    
+
+networks:
+  worldcup-network:
+    driver: bridge  
